@@ -16,6 +16,13 @@ public class GameController : MonoBehaviour {
 	Color[] myColors = { Color.blue, Color.red, Color.green, Color.yellow, Color.magenta };
 	int score = 0;
 
+	// Use this for initialization
+	void Start () {
+
+		CreateGrid ();
+
+	}
+
 	void CreateGrid () {
 		grid = new GameObject[gridX, gridY];
 
@@ -23,9 +30,10 @@ public class GameController : MonoBehaviour {
 			for (int x = 0; x < gridX; x++) {
 				cubePos = new Vector3 (x * 2, y * 2, 0);
 				grid[x,y] = Instantiate (cubePrefab, cubePos, Quaternion.identity);
+				grid [x, y].GetComponent<CubeController> ().myX = x;
+				grid [x, y].GetComponent<CubeController> ().myY = y;
 			}
 		}
-
 	}
 
 	void CreateNextCube () {
@@ -44,29 +52,68 @@ public class GameController : MonoBehaviour {
 		}
 	}
 
-	int FindAvailableCube (int y) {
-		// given a specific row, find a random white cube in that row, and return the x value
-		// or, if there isn't one, return -1
+	GameObject PickWhiteCube (List<GameObject> whiteCubes) {
+		// no white cubes in the row
+		if (whiteCubes.Count == 0) {
+			// error value
+			return null;
+		}
 
-		// placeholder, just return a random x value
-		return Random.Range(0, gridX);
+		// pick a random white cube
+		return whiteCubes[ Random.Range(0, whiteCubes.Count) ];
 	}
 
-	void PlaceNextCube (int y) {
-		int x = FindAvailableCube (y);
+	GameObject FindAvailableCube (int y) {
+		List<GameObject> whiteCubes = new List<GameObject> ();
 
+		// make a list of white cubes
+		for (int x = 0; x < gridX; x++) {
+			if (grid [x, y].GetComponent<Renderer> ().material.color == Color.white) {
+				whiteCubes.Add(grid[x,y]);
+			}
+		}
+
+		return PickWhiteCube (whiteCubes);
+	}
+
+	GameObject FindAvailableCube () {
+		List<GameObject> whiteCubes = new List<GameObject> ();
+
+		// make a list of white cubes
+		for (int y = 0; y < gridY; y++) {
+			for (int x = 0; x < gridX; x++) {
+				if (grid [x, y].GetComponent<Renderer> ().material.color == Color.white) {
+					whiteCubes.Add (grid [x, y]);
+				}
+			}
+		}
+	
+		return PickWhiteCube (whiteCubes);
+	}
+
+	void SetCubeColor (GameObject myCube, Color color) {
 		// no available cube in that row
-		if (x == -1) {
+		if (myCube == null) {
 			EndGame (false);
 		}
 		else {
 			// assign the nextCube's color to the chosen cube
-			grid [x, y].GetComponent<Renderer> ().material.color = nextCube.GetComponent<Renderer> ().material.color;
+			myCube.GetComponent<Renderer> ().material.color = color;
 			Destroy (nextCube);
 			nextCube = null;
-
 		}
+	}
 
+	void PlaceNextCube (int y) {
+		GameObject whiteCube = FindAvailableCube (y);
+
+		SetCubeColor (whiteCube, nextCube.GetComponent<Renderer> ().material.color);
+	}
+		
+	void AddBlackCube() {
+		GameObject whiteCube = FindAvailableCube ();
+
+		SetCubeColor (whiteCube, Color.black);
 	}
 
 	void ProcessKeyboardInput () {
@@ -94,24 +141,8 @@ public class GameController : MonoBehaviour {
 			// put it in the specified row, subtracting 1 since the grid array has a 0-based index
 			PlaceNextCube (numKeyPressed - 1);
 		}
-
-
-
 	}
 
-	void AddBlackCube() {
-		// find a random white cube and turn it black
-		// if that's impossible, end the game in a loss
-		print ("Added a black cube!");
-	}
-
-	// Use this for initialization
-	void Start () {
-
-		CreateGrid ();
-		
-	}
-	
 	// Update is called once per frame
 	void Update () {
 		ProcessKeyboardInput ();
@@ -122,7 +153,6 @@ public class GameController : MonoBehaviour {
 			// if we still have an existing Next Cube
 			if (nextCube != null) {
 				score -= 1;
-				Destroy (nextCube);
 				AddBlackCube ();
 			}
 
