@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class GameController : MonoBehaviour {
-	public GameObject cubePrefab, nextCubePrefab;
+	public GameObject cubePrefab;
 	float gameLength = 60;
 	int gridX = 8;
 	int gridY = 5;
@@ -16,6 +16,8 @@ public class GameController : MonoBehaviour {
 	Color[] myColors = { Color.blue, Color.red, Color.green, Color.yellow, Color.magenta };
 	int score = 0;
 	GameObject activeCube = null;
+	int rainbowPoints = 10;
+	int sameColorPoints = 5;
 
 	// Use this for initialization
 	void Start () {
@@ -38,8 +40,9 @@ public class GameController : MonoBehaviour {
 	}
 
 	void CreateNextCube () {
-		nextCube = Instantiate (nextCubePrefab, nextCubePos, Quaternion.identity);
-		nextCube.GetComponent<Renderer> ().material.color = myColors [ Random.Range(0, myColors.Length) ];
+		nextCube = Instantiate (cubePrefab, nextCubePos, Quaternion.identity);
+		nextCube.GetComponent<Renderer> ().material.color = myColors [ Random.Range (0, myColors.Length) ];
+		nextCube.GetComponent<CubeController> ().nextCube = true;
 	}
 
 	void EndGame (bool win) {
@@ -92,6 +95,7 @@ public class GameController : MonoBehaviour {
 		return PickWhiteCube (whiteCubes);
 	}
 
+	// This method is called SetCubeColor, but it does more than that too! Beware!
 	void SetCubeColor (GameObject myCube, Color color) {
 		// no available cube in that row
 		if (myCube == null) {
@@ -114,6 +118,7 @@ public class GameController : MonoBehaviour {
 	void AddBlackCube() {
 		GameObject whiteCube = FindAvailableCube ();
 
+		// use a color value that is beyond the max
 		SetCubeColor (whiteCube, Color.black);
 	}
 
@@ -181,7 +186,6 @@ public class GameController : MonoBehaviour {
 				clickedCube.transform.localScale *= 1.5f;
 				clickedCube.GetComponent<CubeController> ().active = true;
 
-
 				// set the old active cube to be white and not active
 				activeCube.GetComponent<Renderer> ().material.color = Color.white;
 				activeCube.transform.localScale /= 1.5f;
@@ -193,9 +197,90 @@ public class GameController : MonoBehaviour {
 		}
 	}
 
+	bool IsRainbowPlus (int x, int y) {
+		Color a = grid [x, y].GetComponent<Renderer> ().material.color;
+		Color b = grid [x+1, y].GetComponent<Renderer> ().material.color;
+		Color c = grid [x-1, y].GetComponent<Renderer> ().material.color;
+		Color d = grid [x, y+1].GetComponent<Renderer> ().material.color;
+		Color e = grid [x, y-1].GetComponent<Renderer> ().material.color;
+
+		// if any of the colors are white or black, there's no rainbow plus
+		if (a == Color.white || a == Color.black ||
+		    b == Color.white || b == Color.black ||
+		    c == Color.white || c == Color.black ||
+		    d == Color.white || d == Color.black ||
+		    e == Color.white || e == Color.black) {
+			return false;
+		}
+
+		// ensure that every color is different from every other color
+		if (a != b && a != c && a != d && a != e &&
+		    b != c && b != d && b != e &&
+		    c != d && c != e &&
+		    d != e) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+
+	bool IsSameColorPlus (int x, int y) {
+		if (grid [x, y].GetComponent<Renderer> ().material.color != Color.white &&
+			grid [x, y].GetComponent<Renderer> ().material.color != Color.black &&
+			grid [x, y].GetComponent<Renderer> ().material.color == grid [x + 1, y].GetComponent<Renderer> ().material.color &&
+		    grid [x, y].GetComponent<Renderer> ().material.color == grid [x - 1, y].GetComponent<Renderer> ().material.color &&
+		    grid [x, y].GetComponent<Renderer> ().material.color == grid [x, y + 1].GetComponent<Renderer> ().material.color &&
+		    grid [x, y].GetComponent<Renderer> ().material.color == grid [x, y - 1].GetComponent<Renderer> ().material.color) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	void MakeBlackPlus (int x, int y) {
+		// this is an error check to ensure that the x and y aren't on the edge of the grid
+		if (x == 0 || y == 0 || x == gridX - 1 || y == gridY - 1) {
+			return;
+		}
+
+		grid [x, y].GetComponent<Renderer> ().material.color = Color.black;
+		grid [x+1, y].GetComponent<Renderer> ().material.color = Color.black;
+		grid [x-1, y].GetComponent<Renderer> ().material.color = Color.black;
+		grid [x, y+1].GetComponent<Renderer> ().material.color = Color.black;
+		grid [x, y-1].GetComponent<Renderer> ().material.color = Color.black;
+
+		// if we had an active cube and it was involved in the plus
+		if (activeCube != null && activeCube.GetComponent<Renderer>().material.color == Color.black) {
+			// deactivate it
+			activeCube.transform.localScale /= 1.5f;
+			activeCube.GetComponent<CubeController> ().active = false;
+			activeCube = null;
+		}
+
+
+	}
+
+	void Score () {
+		// check the whole grid, except for the edges, since the center of a plus could never be on an edge
+		for (int x = 1; x < gridX - 1; x++) {
+			for (int y = 1; y < gridY - 1; y++) {
+				if (IsRainbowPlus (x, y)) {
+					score += rainbowPoints;
+					MakeBlackPlus (x, y);
+				}
+				if (IsSameColorPlus (x, y)) {
+					score += sameColorPoints;
+					MakeBlackPlus (x, y);
+				}
+			}
+		}
+	}
+
 	// Update is called once per frame
 	void Update () {
 		ProcessKeyboardInput ();
+		Score();
 
 		if (Time.time > turnLength * turn) {
 			turn++;
