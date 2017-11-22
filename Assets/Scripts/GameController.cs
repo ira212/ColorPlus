@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class GameController : MonoBehaviour {
-	public GameObject cubePrefab;
+	public GameObject cubePrefab, nextCubePrefab;
 	float gameLength = 60;
 	int gridX = 8;
 	int gridY = 5;
@@ -15,6 +15,7 @@ public class GameController : MonoBehaviour {
 	int turn = 0;
 	Color[] myColors = { Color.blue, Color.red, Color.green, Color.yellow, Color.magenta };
 	int score = 0;
+	GameObject activeCube = null;
 
 	// Use this for initialization
 	void Start () {
@@ -37,7 +38,7 @@ public class GameController : MonoBehaviour {
 	}
 
 	void CreateNextCube () {
-		nextCube = Instantiate (cubePrefab, nextCubePos, Quaternion.identity);
+		nextCube = Instantiate (nextCubePrefab, nextCubePos, Quaternion.identity);
 		nextCube.GetComponent<Renderer> ().material.color = myColors [ Random.Range(0, myColors.Length) ];
 	}
 
@@ -140,6 +141,55 @@ public class GameController : MonoBehaviour {
 			
 			// put it in the specified row, subtracting 1 since the grid array has a 0-based index
 			PlaceNextCube (numKeyPressed - 1);
+		}
+	}
+
+	public void ProcessClick (GameObject clickedCube, int x, int y, Color cubeColor, bool active) {
+		// did we click on a colored cube?
+		if (cubeColor != Color.white && cubeColor != Color.black) {
+
+			// if that cube was active
+			if (active) {
+				// deactivate it
+				clickedCube.transform.localScale /= 1.5f;
+				clickedCube.GetComponent<CubeController> ().active = false;
+				activeCube = null;
+			}
+			// the colored clicked cube was not active
+			else {
+				// deactivate any previously active cube
+				if (activeCube != null) {
+					activeCube.transform.localScale /= 1.5f;
+					activeCube.GetComponent<CubeController> ().active = false;
+				}
+
+				// activate the newly clicked cube
+				clickedCube.transform.localScale *= 1.5f;
+				clickedCube.GetComponent<CubeController> ().active = true;
+				activeCube = clickedCube;
+
+			}
+		}
+		else if (cubeColor == Color.white && activeCube != null) {
+			int xDist = clickedCube.GetComponent<CubeController> ().myX - activeCube.GetComponent<CubeController> ().myX;
+			int yDist = clickedCube.GetComponent<CubeController> ().myY - activeCube.GetComponent<CubeController> ().myY;
+
+			// if we are within 1 including diagonals
+			if (Mathf.Abs (yDist) <= 1 && Mathf.Abs (xDist) <= 1) {
+				// set the clicked cube to be active
+				clickedCube.GetComponent<Renderer> ().material.color = activeCube.GetComponent<Renderer> ().material.color;
+				clickedCube.transform.localScale *= 1.5f;
+				clickedCube.GetComponent<CubeController> ().active = true;
+
+
+				// set the old active cube to be white and not active
+				activeCube.GetComponent<Renderer> ().material.color = Color.white;
+				activeCube.transform.localScale /= 1.5f;
+				activeCube.GetComponent<CubeController> ().active = false;
+
+				// keep track of the new active cube
+				activeCube = clickedCube;
+			}
 		}
 	}
 
